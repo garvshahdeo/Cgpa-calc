@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garv's CGPA Calculator — Physics IMS</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #05050f;
+    --surface: #0d0d1f;
+    --surface2: #13132a;
+    --border: #1e1e3f;
+    --accent: #7c6af7;
+    --accent2: #f76a8c;
+    --accent3: #6af7c4;
+    --text: #e8e8f0;
+    --muted: #6b6b8f;
+    --fail: #f76a6a;
+    --pass: #6af7a0;
+    --gold: #f7c36a;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* NOISE OVERLAY */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 9999; opacity: 0.4;
+  }
+
+  /* GRID BACKGROUND */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none; z-index: 0; opacity: 0.4;
+  }
+
+  .container { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 20px 80px; }
+
+  /* HEADER */
+  header {
+    padding: 60px 0 40px;
+    text-align: center;
+    position: relative;
+  }
+  .brand-tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: block;
+  }
+  .brand-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(52px, 10vw, 96px);
+    letter-spacing: 2px;
+    line-height: 0.9;
+    background: linear-gradient(135deg, #fff 0%, var(--accent) 50%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  .brand-sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 14px;
+    letter-spacing: 2px;
+  }
+  .disclaimer {
+    display: inline-block;
+    margin-top: 18px;
+    background: rgba(247, 106, 140, 0.1);
+    border: 1px solid rgba(247, 106, 140, 0.3);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: var(--accent2);
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* GRADE SCALE */
+  .grade-scale {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin: 32px 0;
+  }
+  .grade-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    transition: all 0.2s;
+  }
+  .grade-chip span { color: var(--accent); font-weight: 700; }
+
+  /* SECTION CARDS */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .card:hover { border-color: rgba(124, 106, 247, 0.4); }
+  .card:hover::before { opacity: 1; }
+
+  .card-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 1px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* SEM SELECTOR */
+  .sem-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+  @media(max-width: 600px) { .sem-grid { grid-template-columns: repeat(2, 1fr); } }
+  .sem-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 8px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.25s;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+  }
+  .sem-btn .sem-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    color: var(--text);
+    display: block;
+    line-height: 1;
+  }
+  .sem-btn:hover { border-color: var(--accent); background: rgba(124,106,247,0.08); }
+  .sem-btn.active {
+    border-color: var(--accent);
+    background: rgba(124,106,247,0.15);
+    color: var(--accent);
+  }
+  .sem-btn.active .sem-num { color: var(--accent); }
+
+  /* PREVIOUS SGPA */
+  .prev-sgpa-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+  .prev-sgpa-item label {
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .prev-sgpa-item input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .prev-sgpa-item input:focus { border-color: var(--accent); }
+
+  /* SUBJECT TABLE */
+  .subjects-section { margin-top: 20px; }
+  .subjects-header {
+    display: grid;
+    grid-template-columns: 1fr 120px 90px 100px;
+    gap: 10px;
+    padding: 0 12px 8px;
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .subject-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 90px 100px;
+    gap: 10px;
+    padding: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    align-items: center;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .subject-row.failing {
+    border-color: rgba(247, 106, 106, 0.4);
+    background: rgba(247, 106, 106, 0.05);
+  }
+  .subject-row.failing .sub-name { text-decoration: line-through; color: var(--fail); opacity: 0.7; }
+  .sub-name {
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+  }
+  .sub-type {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  select, .grade-select {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    outline: none;
+    cursor: pointer;
+    width: 100%;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+  select:focus, .grade-select:focus { border-color: var(--accent); }
+
+  .credits-badge {
+    background: rgba(124,106,247,0.15);
+    border: 1px solid rgba(124,106,247,0.3);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+    text-align: center;
+  }
+
+  .fail-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    cursor: pointer;
+    user-select: none;
+  }
+  .fail-toggle input[type=checkbox] { display: none; }
+  .fail-dot {
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface);
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+  .fail-toggle input:checked ~ .fail-dot {
+    background: var(--fail);
+    border-color: var(--fail);
+  }
+  .fail-label { font-size: 10px; }
+
+  /* RESULTS PANEL */
+  .results-panel {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-top: 24px;
+  }
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+  .result-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+  .result-box:hover { transform: translateY(-2px); }
+  .result-box::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .result-box.sgpa::after { background: var(--accent); }
+  .result-box.cgpa::after { background: var(--accent2); }
+  .result-box.without-fail::after { background: var(--accent3); }
+  .result-box.target::after { background: var(--gold); }
+
+  .result-label {
+    font-size: 10px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  .result-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 44px;
+    line-height: 1;
+    letter-spacing: 1px;
+  }
+  .result-box.sgpa .result-value { color: var(--accent); }
+  .result-box.cgpa .result-value { color: var(--accent2); }
+  .result-box.without-fail .result-value { color: var(--accent3); }
+  .result-box.target .result-value { color: var(--gold); }
+  .result-sub {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* CGPA TARGET */
+  .target-section {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .target-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .target-row label {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .target-row input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    outline: none;
+    width: 90px;
+    transition: border-color 0.2s;
+  }
+  .target-row input:focus { border-color: var(--gold); }
+  .target-result {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 1px;
+  }
+
+  /* CALC BUTTON */
+  .calc-btn {
+    display: block;
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .calc-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .calc-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(124,106,247,0.4); }
+  .calc-btn:hover::before { opacity: 0.05; }
+  .calc-btn:active { transform: translateY(0); }
+
+  /* GRADE DISTRIBUTION BAR */
+  .grade-bar-section { margin-top: 20px; }
+  .grade-bar-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+  }
+  .grade-bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    gap: 2px;
+  }
+  .grade-bar-seg { height: 100%; border-radius: 3px; transition: width 0.5s ease; }
+
+  /* FOOTER */
+  footer {
+    text-align: center;
+    padding: 40px 0 20px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    position: relative; z-index: 1;
+  }
+  footer span { color: var(--accent); }
+
+  /* TRANSITION OVERLAY */
+  .transition-overlay {
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .transition-overlay.active { opacity: 1; pointer-events: all; }
+  .transition-text {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 72px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    animation: pulse 0.6s ease infinite alternate;
+  }
+  @keyframes pulse { from { opacity: 0.3; transform: scale(0.97); } to { opacity: 1; transform: scale(1.03); } }
+
+  /* SECTION TRANSITION */
+  .section-animate {
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .section-animate.visible { opacity: 1; transform: translateY(0); }
+
+  /* TOOLTIP */
+  .info-icon {
+    display: inline-block;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    text-align: center;
+    line-height: 16px;
+    cursor: help;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    margin-left: 6px;
+  }
+
+  .warn-box {
+    background: rgba(247,195,106,0.08);
+    border: 1px solid rgba(247,195,106,0.25);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 12px;
+    color: var(--gold);
+    font-family: 'Space Mono', monospace;
+    margin-top: 12px;
+  }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="transition-overlay" id="transOverlay">
+  <div class="transition-text" id="transText">SEM —</div>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <span class="brand-tag">✦ Integrated B.Sc. & M.Sc. Physics ✦</span>
+    <div class="brand-title">GARV'S<br>CGPA CALC</div>
+    <div class="brand-sub">DELHI TECHNOLOGICAL UNIVERSITY (or applicable university)</div>
+    <div class="disclaimer">⚠ No relative grading applied — absolute grade points only</div>
+  </header>
+
+  <!-- GRADE SCALE REFERENCE -->
+  <div class="grade-scale">
+    <div class="grade-chip"><span>O</span> 91–100 → 10</div>
+    <div class="grade-chip"><span>A+</span> 81–90 → 9</div>
+    <div class="grade-chip"><span>A</span> 71–80 → 8</div>
+    <div class="grade-chip"><span>B+</span> 61–70 → 7</div>
+    <div class="grade-chip"><span>B</span> 51–60 → 6</div>
+    <div class="grade-chip"><span>C</span> 40–50 → 5</div>
+    <div class="grade-chip"><span>F</span> &lt;40 → 0</div>
+    <div class="grade-chip"><span>NE</span> Not enrolled</div>
+  </div>
+
+  <!-- STEP 1: SELECT SEMESTER -->
+  <div class="card section-animate visible" id="step1">
+    <div class="card-title">01 — Current Semester</div>
+    <div class="card-desc">// select the semester you are in right now</div>
+    <div class="sem-grid" id="semGrid">
+      <!-- filled by JS -->
+    </div>
+  </div>
+
+  <!-- STEP 2: PREVIOUS SGPA -->
+  <div class="card section-animate" id="step2" style="display:none">
+    <div class="card-title">02 — Previous Semester SGPAs</div>
+    <div class="card-desc">// enter your SGPA for each completed semester (0–10)</div>
+    <div class="prev-sgpa-grid" id="prevSGPAGrid"></div>
+  </div>
+
+  <!-- STEP 3: CURRENT SEM SUBJECTS -->
+  <div class="card section-animate" id="step3" style="display:none">
+    <div class="card-title">03 — Current Semester Subjects</div>
+    <div class="card-desc">// select grade point per subject · mark failing subjects with ✕</div>
+    <div class="subjects-section">
+      <div class="subjects-header">
+        <div>Subject</div>
+        <div>Grade</div>
+        <div>Credits</div>
+        <div>Failing?</div>
+      </div>
+      <div id="subjectRows"></div>
+    </div>
+    <button class="calc-btn" onclick="calculate()">⟳ CALCULATE CGPA</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="card section-animate" id="resultsCard" style="display:none">
+    <div class="card-title">04 — Results</div>
+    <div class="card-desc">// based on absolute grading, no relative scaling</div>
+
+    <div class="results-grid">
+      <div class="result-box sgpa">
+        <div class="result-label">This Sem SGPA</div>
+        <div class="result-value" id="res-sgpa">—</div>
+        <div class="result-sub" id="res-sgpa-sub">grade points</div>
+      </div>
+      <div class="result-box cgpa">
+        <div class="result-label">Cumulative CGPA</div>
+        <div class="result-value" id="res-cgpa">—</div>
+        <div class="result-sub" id="res-cgpa-sub">all sems</div>
+      </div>
+      <div class="result-box without-fail">
+        <div class="result-label">CGPA (w/o fails)</div>
+        <div class="result-value" id="res-nofail">—</div>
+        <div class="result-sub">if fails cleared</div>
+      </div>
+    </div>
+
+    <div id="failImpactBox" class="warn-box" style="display:none"></div>
+
+    <!-- CGPA TARGETER -->
+    <div class="target-section">
+      <div class="card-title" style="font-size:16px; margin-bottom:6px;">CGPA Targeter</div>
+      <div class="card-desc" style="margin-bottom:14px;">// what SGPA do you need this sem to hit a desired cumulative CGPA?</div>
+      <div class="target-row">
+        <label>Target CGPA →</label>
+        <input type="number" id="targetCGPA" min="0" max="10" step="0.1" placeholder="e.g. 8.5" oninput="calcTarget()">
+        <div class="target-result" id="targetResult">Enter target above</div>
+      </div>
+    </div>
+
+    <!-- GRADE BAR -->
+    <div class="grade-bar-section">
+      <div class="grade-bar-label">GRADE DISTRIBUTION — THIS SEM</div>
+      <div class="grade-bar" id="gradeBar"></div>
+      <div style="display:flex; gap:12px; margin-top:8px; flex-wrap:wrap;" id="gradeBarLegend"></div>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  Built by <span>Garv</span> · Integrated Physics IMS ·
+  <span>No relative grading</span> · Absolute grade points only
+</footer>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+
+const GRADE_POINTS = { 'O':10, 'A+':9, 'A':8, 'B+':7, 'B':6, 'C':5, 'F':0, 'NE': null };
+const GRADE_COLORS = { 'O':'#7c6af7','A+':'#a06af7','A':'#6af7c4','B+':'#6ab0f7','B':'#f7c36a','C':'#f7a06a','F':'#f76a6a' };
+
+const SEMESTERS = {
+  1: {
+    name: "1st Year · Sem I",
+    subjects: [
+      { code:"IMSPH 101", name:"Mathematical Physics-I", type:"DCC-1", credits:4 },
+      { code:"IMSPH 103", name:"Introduction to Mechanics", type:"DCC-2", credits:4 },
+      { code:"IMSPH 105", name:"Elements of Electricity & Magnetism", type:"DCC-3", credits:4 },
+      { code:"IMSPH 107", name:"Physics-I", type:"GEC-1", credits:4 },
+      { code:"ISEC 1yy", name:"SEC-1 (Skill Enhancement)", type:"SEC", credits:2 },
+      { code:"IVAC 1yy", name:"VAC-1 (Value Added)", type:"VAC", credits:2 },
+      { code:"IAEC 1yy", name:"AEC-1 (Ability Enhancement)", type:"AEC", credits:2 },
+    ]
+  },
+  2: {
+    name: "1st Year · Sem II",
+    subjects: [
+      { code:"IMSPH 102", name:"Mathematical Physics-II", type:"DCC-4", credits:4 },
+      { code:"IMSPH 104", name:"Physics of Vibrations & Waves", type:"DCC-5", credits:4 },
+      { code:"IMSPH 106", name:"Analog Electronics", type:"DCC-6", credits:4 },
+      { code:"IMSPH 108", name:"Physics-II", type:"GEC-2", credits:4 },
+      { code:"IAEC 1yy", name:"AEC-2 (Ability Enhancement)", type:"AEC", credits:2 },
+      { code:"ISEC 110", name:"Introduction to Glass Technology", type:"SEC-2", credits:2 },
+      { code:"IVAC 1yy", name:"VAC-2 (Value Added)", type:"VAC", credits:2 },
+    ]
+  },
+  3: {
+    name: "2nd Year · Sem III",
+    subjects: [
+      { code:"IMSPH 201", name:"Numerical Analysis", type:"DCC-7", credits:4 },
+      { code:"IMSPH 203", name:"Modern Physics", type:"DCC-8", credits:4 },
+      { code:"IMSPH 205", name:"Optics", type:"DCC-9", credits:4 },
+      { code:"IMSPH 207", name:"Basic Electronics", type:"GEC-3", credits:2 },
+      { code:"IMSPH 211", name:"Intro to Nuclear Physics (DEC-1)", type:"DEC-1/GEC-4", credits:4 },
+      { code:"IAEC 2yy", name:"AEC-3 (Ability Enhancement)", type:"AEC", credits:2 },
+      { code:"ISEC 201", name:"Data Analysis with Python & Jupyter", type:"SEC-3", credits:2 },
+    ]
+  },
+  4: {
+    name: "2nd Year · Sem IV",
+    subjects: [
+      { code:"IMSPH 202", name:"Solid State Physics", type:"DCC-10", credits:4 },
+      { code:"IMSPH 204", name:"Thermal & Statistical Physics", type:"DCC-11", credits:4 },
+      { code:"IMSPH 206", name:"Digital Electronics", type:"DCC-12", credits:4 },
+      { code:"IMSPH 210", name:"Renewable Energy (DEC-2)", type:"DEC-2/GEC-5", credits:4 },
+      { code:"IAEC 2yy", name:"AEC-4 (Ability Enhancement)", type:"AEC", credits:2 },
+      { code:"ISEC 202", name:"MATLAB", type:"SEC-4", credits:2 },
+      { code:"IVAC 2yy", name:"VAC-3 (Value Added)", type:"VAC", credits:2 },
+    ]
+  },
+};
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let currentSem = null;
+let prevSGPAs = {};
+let prevCreditTotals = {};  // total credits per prev sem
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+
+function init() {
+  // Semester selector buttons
+  const grid = document.getElementById('semGrid');
+  const semLabels = ["SEM I","SEM II","SEM III","SEM IV"];
+  const semYears = ["Yr 1","Yr 1","Yr 2","Yr 2"];
+  [1,2,3,4].forEach(s => {
+    const btn = document.createElement('div');
+    btn.className = 'sem-btn';
+    btn.innerHTML = `<span class="sem-num">${s}</span>${semLabels[s-1]}<br><small style="color:var(--muted);font-size:9px">${semYears[s-1]}</small>`;
+    btn.onclick = () => selectSem(s);
+    grid.appendChild(btn);
+  });
+}
+
+function showTransition(text, cb) {
+  const ov = document.getElementById('transOverlay');
+  const tx = document.getElementById('transText');
+  tx.textContent = text;
+  ov.classList.add('active');
+  setTimeout(() => {
+    cb();
+    setTimeout(() => ov.classList.remove('active'), 350);
+  }, 600);
+}
+
+function revealSection(id) {
+  const el = document.getElementById(id);
+  el.style.display = '';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => el.classList.add('visible'));
+  });
+}
+
+function selectSem(s) {
+  if (currentSem === s) return;
+  showTransition(`SEMESTER ${s}`, () => {
+    currentSem = s;
+    document.querySelectorAll('.sem-btn').forEach((b,i) => {
+      b.classList.toggle('active', i+1 === s);
+    });
+    buildPrevSGPA(s);
+    buildSubjects(s);
+    revealSection('step2');
+    revealSection('step3');
+    document.getElementById('resultsCard').style.display = 'none';
+    document.getElementById('resultsCard').classList.remove('visible');
+  });
+}
+
+function buildPrevSGPA(s) {
+  const grid = document.getElementById('prevSGPAGrid');
+  grid.innerHTML = '';
+  if (s === 1) {
+    grid.innerHTML = '<div style="color:var(--muted);font-family:\'Space Mono\',monospace;font-size:12px;">No previous semesters — this is your first!</div>';
+    return;
+  }
+  for (let i = 1; i < s; i++) {
+    const div = document.createElement('div');
+    div.className = 'prev-sgpa-item';
+    const semCredits = Object.values(SEMESTERS[i].subjects).reduce((a,sub) => a + sub.credits, 0);
+    div.innerHTML = `<label>SEM ${i} SGPA</label>
+      <input type="number" min="0" max="10" step="0.01" placeholder="0.00 – 10.00"
+        id="prevSGPA_${i}" value="${prevSGPAs[i] || ''}"
+        oninput="prevSGPAs[${i}]=parseFloat(this.value)||0; prevCreditTotals[${i}]=${semCredits};">`;
+    grid.appendChild(div);
+    prevCreditTotals[i] = semCredits;
+  }
+}
+
+function buildSubjects(s) {
+  const container = document.getElementById('subjectRows');
+  container.innerHTML = '';
+  SEMESTERS[s].subjects.forEach((sub, idx) => {
+    const row = document.createElement('div');
+    row.className = 'subject-row';
+    row.id = `row_${idx}`;
+
+    const gradeOptions = Object.entries(GRADE_POINTS)
+      .map(([g, p]) => `<option value="${g}">${g}${p!==null?' ('+p+')':' (skip)'}</option>`)
+      .join('');
+
+    row.innerHTML = `
+      <div>
+        <div class="sub-name">${sub.name}</div>
+        <div class="sub-type">${sub.code} · ${sub.type}</div>
+      </div>
+      <select class="grade-select" id="grade_${idx}" onchange="updateRowState(${idx})">
+        <option value="">— Grade —</option>
+        ${gradeOptions}
+      </select>
+      <div class="credits-badge">${sub.credits} cr</div>
+      <label class="fail-toggle" title="Mark as failing — see impact on CGPA">
+        <input type="checkbox" id="fail_${idx}" onchange="toggleFail(${idx})">
+        <div class="fail-dot"></div>
+        <span class="fail-label">FAIL</span>
+      </label>`;
+    container.appendChild(row);
+  });
+}
+
+function updateRowState(idx) {
+  const g = document.getElementById(`grade_${idx}`).value;
+  const failCb = document.getElementById(`fail_${idx}`);
+  if (g === 'F') { failCb.checked = true; toggleFail(idx); }
+  else if (g && g !== 'NE') { failCb.checked = false; toggleFail(idx); }
+}
+
+function toggleFail(idx) {
+  const checked = document.getElementById(`fail_${idx}`).checked;
+  document.getElementById(`row_${idx}`).classList.toggle('failing', checked);
+}
+
+// ─── CALCULATE ────────────────────────────────────────────────────────────────
+
+function calculate() {
+  if (!currentSem) return;
+  const subs = SEMESTERS[currentSem].subjects;
+
+  let thisSemPoints = 0, thisSemCredits = 0;
+  let thisSemPointsNoFail = 0, thisSemCreditsNoFail = 0;
+  let gradeCounts = {};
+
+  let allValid = true;
+  subs.forEach((sub, idx) => {
+    const g = document.getElementById(`grade_${idx}`).value;
+    if (!g) { allValid = false; return; }
+    if (g === 'NE') return;
+    const p = GRADE_POINTS[g];
+    if (p === null) return;
+    const isFailing = document.getElementById(`fail_${idx}`).checked;
+
+    thisSemPoints += p * sub.credits;
+    thisSemCredits += sub.credits;
+    gradeCounts[g] = (gradeCounts[g] || 0) + sub.credits;
+
+    if (!isFailing) {
+      thisSemPointsNoFail += p * sub.credits;
+      thisSemCreditsNoFail += sub.credits;
+    }
+  });
+
+  if (!allValid) {
+    alert("Please select a grade for all subjects (use NE if not enrolled).");
+    return;
+  }
+
+  const sgpa = thisSemCredits > 0 ? (thisSemPoints / thisSemCredits) : 0;
+  const sgpaNoFail = thisSemCreditsNoFail > 0 ? (thisSemPointsNoFail / thisSemCreditsNoFail) : 0;
+
+  // Cumulative CGPA
+  let totalPoints = thisSemPoints, totalCredits = thisSemCredits;
+  let totalPointsNoFail = thisSemPointsNoFail, totalCreditsNoFail = thisSemCreditsNoFail;
+
+  for (let i = 1; i < currentSem; i++) {
+    const prevSGPA = prevSGPAs[i] || 0;
+    const prevCr = prevCreditTotals[i] || Object.values(SEMESTERS[i].subjects).reduce((a,s) => a+s.credits, 0);
+    totalPoints += prevSGPA * prevCr;
+    totalCredits += prevCr;
+    totalPointsNoFail += prevSGPA * prevCr;
+    totalCreditsNoFail += prevCr;
+  }
+
+  const cgpa = totalCredits > 0 ? (totalPoints / totalCredits) : 0;
+  const cgpaNoFail = totalCreditsNoFail > 0 ? (totalPointsNoFail / totalCreditsNoFail) : 0;
+
+  // Render results
+  document.getElementById('res-sgpa').textContent = sgpa.toFixed(2);
+  document.getElementById('res-cgpa').textContent = cgpa.toFixed(2);
+  document.getElementById('res-nofail').textContent = cgpaNoFail.toFixed(2);
+  document.getElementById('res-sgpa-sub').textContent = `${thisSemCredits} credits`;
+  document.getElementById('res-cgpa-sub').textContent = `${totalCredits} credits total`;
+
+  // Fail impact message
+  const failBox = document.getElementById('failImpactBox');
+  const diff = cgpaNoFail - cgpa;
+  const hasFails = subs.some((_, idx) => document.getElementById(`fail_${idx}`).checked);
+  if (hasFails && diff > 0.0005) {
+    failBox.style.display = '';
+    failBox.textContent = `📈 Clearing your marked failing subjects would raise your CGPA by +${diff.toFixed(2)} (from ${cgpa.toFixed(2)} → ${cgpaNoFail.toFixed(2)})`;
+  } else if (hasFails) {
+    failBox.style.display = '';
+    failBox.textContent = `✓ Clearing marked fails would not significantly change your CGPA.`;
+  } else {
+    failBox.style.display = 'none';
+  }
+
+  // Grade bar
+  const bar = document.getElementById('gradeBar');
+  const legend = document.getElementById('gradeBarLegend');
+  bar.innerHTML = ''; legend.innerHTML = '';
+  Object.entries(gradeCounts).forEach(([g, cr]) => {
+    const seg = document.createElement('div');
+    seg.className = 'grade-bar-seg';
+    seg.style.width = `${(cr / thisSemCredits * 100)}%`;
+    seg.style.background = GRADE_COLORS[g] || '#444';
+    seg.title = `${g}: ${cr} credits`;
+    bar.appendChild(seg);
+    const li = document.createElement('div');
+    li.style.cssText = `font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);display:flex;align-items:center;gap:5px;`;
+    li.innerHTML = `<span style="width:8px;height:8px;border-radius:2px;background:${GRADE_COLORS[g]||'#444'};display:inline-block;"></span>${g} ${cr}cr`;
+    legend.appendChild(li);
+  });
+
+  // Store for targeter
+  window._calcState = { sgpa, cgpa, cgpaNoFail, totalCredits, thisSemCredits,
+    prevPoints: totalPoints - thisSemPoints, prevCredits: totalCredits - thisSemCredits };
+
+  revealSection('resultsCard');
+  document.getElementById('targetCGPA').value = '';
+  document.getElementById('targetResult').textContent = 'Enter target above';
+
+  setTimeout(() => {
+    document.getElementById('resultsCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 200);
+}
+
+function calcTarget() {
+  const state = window._calcState;
+  if (!state) return;
+  const desired = parseFloat(document.getElementById('targetCGPA').value);
+  const res = document.getElementById('targetResult');
+  if (!desired || desired < 0 || desired > 10) { res.textContent = '—'; return; }
+
+  // desired = (prevPoints + neededSGPA * thisSemCredits) / totalCredits
+  // neededSGPA = (desired * totalCredits - prevPoints) / thisSemCredits
+  const needed = (desired * state.totalCredits - state.prevPoints) / state.thisSemCredits;
+
+  if (needed <= 0) {
+    res.textContent = `Already achieved! (need < 0)`;
+    res.style.color = 'var(--accent3)';
+  } else if (needed > 10) {
+    res.textContent = `Not achievable this sem (need ${needed.toFixed(2)})`;
+    res.style.color = 'var(--fail)';
+  } else {
+    res.textContent = `Need SGPA ≥ ${needed.toFixed(2)} this sem`;
+    res.style.color = needed <= state.sgpa ? 'var(--accent3)' : 'var(--gold)';
+  }
+}
+
+init();
+
+// Intersection observer for section animations
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, { threshold: 0.1 });
+document.querySelectorAll('.section-animate').forEach(el => observer.observe(el));
+</script>
+</body>
+</html>
